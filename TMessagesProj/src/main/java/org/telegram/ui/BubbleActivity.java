@@ -9,6 +9,7 @@
 package org.telegram.ui;
 
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.View;
@@ -16,6 +17,8 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.RelativeLayout;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.NonNull;
 
@@ -62,6 +65,7 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
     // Account whose ConnectionsManager this activity holds a resume on, -1 if none.
     private int networkResumedAccount = -1;
     private boolean isResumed;
+    private OnBackInvokedCallback backCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,6 +118,14 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
 
         handleIntent(getIntent(), false, savedInstanceState != null, false, UserConfig.selectedAccount, 0);
         instance = this;
+
+        // The app opts in to OnBackInvokedCallback, so on Android 13+ onBackPressed() is only called
+        // if a callback routes it here. On the last screen it falls through to Activity's own
+        // task-root back, which tells the system to collapse the bubble.
+        if (Build.VERSION.SDK_INT >= 33) {
+            backCallback = this::onBackPressed;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
     }
 
     private void showPasscodeActivity() {
@@ -250,6 +262,10 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
 
     @Override
     protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+            backCallback = null;
+        }
         super.onDestroy();
         pauseNetwork();
         if (currentAccount != -1) {
@@ -361,12 +377,20 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
 
     @Override
     public void onBackPressed() {
-        if (mainFragmentsStack.size() == 1) {
-            super.onBackPressed();
+        if (passcodeView.getVisibility() == View.VISIBLE) {
+            if (mainFragmentsStack.size() <= 1) {
+                super.onBackPressed();
+            } else {
+                finish();
+            }
             return;
         }
-        if (passcodeView.getVisibility() == View.VISIBLE) {
-            finish();
+        if (mainFragmentsStack.size() <= 1) {
+            // The chat closes what it has open first (emoji panel, search, selection), and only a
+            // chat with nothing left to close collapses the bubble.
+            if (mainFragmentsStack.isEmpty() || mainFragmentsStack.get(0).onBackPressed(true)) {
+                super.onBackPressed();
+            }
             return;
         }
         if (PhotoViewer.getInstance().isVisible()) {

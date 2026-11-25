@@ -3975,7 +3975,13 @@ public class ChatActivity extends BaseFragment implements
                             return;
                         }
                         if (!checkRecordLocked(true, true)) {
-                            finishFragment();
+                            if (inBubbleMode && parentLayout != null && parentLayout.getFragmentStack().size() <= 1 && getParentActivity() != null) {
+                                // In a bubble the arrow on the last screen collapses the bubble like
+                                // back does. Finishing the chat would close the bubble for good.
+                                getParentActivity().onBackPressed();
+                            } else {
+                                finishFragment();
+                            }
                         }
                     }
                 } else if (id == view_as_topics) {
