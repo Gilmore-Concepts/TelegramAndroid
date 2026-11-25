@@ -27,6 +27,7 @@ public class KeyboardNotifier {
     private boolean mMinusNavBar;
 
     private final Rect rect = new Rect();
+    private final int[] windowLocation = new int[2];
 
     public KeyboardNotifier(@NonNull View rootView, Utilities.Callback<Integer> listener) {
         this(rootView, false, listener);
@@ -86,7 +87,11 @@ public class KeyboardNotifier {
         } else {
             rootView.getWindowVisibleDisplayFrame(rect);
             final int screenHeight = (realRootView == null ? rootView : realRootView).getHeight();
-            keyboardHeight = screenHeight - rect.bottom;
+            // rect is in screen coordinates, so a window that doesn't start at the top of the screen
+            // (a bubble, split screen, a freeform window) has to add its own top, or the keyboard
+            // height comes out short by that much.
+            rootView.getRootView().getLocationOnScreen(windowLocation);
+            keyboardHeight = Math.max(0, windowLocation[1]) + screenHeight - rect.bottom;
         }
         if (mMinusNavBar) {
             keyboardHeight = Math.max(0, keyboardHeight - AndroidUtilities.navigationBarHeight);

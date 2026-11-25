@@ -6898,7 +6898,9 @@ public class ChatActivityEnterView extends FrameLayout implements
             senderSelectPopupWindow.setPauseNotifications(false);
             senderSelectPopupWindow.dismiss();
         }
-        if (keyboardVisible) {
+        // Skipped in a bubble: collapsing a bubble pauses it, and bringing the keyboard back when it
+        // is expanded again means the first back press only hides the keyboard.
+        if (keyboardVisible && (parentFragment == null || !parentFragment.isInBubbleMode())) {
             showKeyboardOnResume = true;
         }
         AndroidUtilities.runOnUIThread(hideKeyboardRunnable = () -> {

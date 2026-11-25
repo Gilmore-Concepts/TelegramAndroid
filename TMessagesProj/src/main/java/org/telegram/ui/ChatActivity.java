@@ -14673,7 +14673,8 @@ public class ChatActivity extends BaseFragment implements
         createChatAttachView();
         chatAttachAlert.restrictEphemeralMessageTypes = isEphemeralMessage || chatMode == MODE_WELCOME_MESSAGES;
         chatAttachAlert.getPhotoLayout().loadGalleryPhotos();
-        if (Build.VERSION.SDK_INT == 21 || Build.VERSION.SDK_INT == 22) {
+        // In a bubble the keyboard stays up over the sheet and hides its caption bar, so close it.
+        if (Build.VERSION.SDK_INT == 21 || Build.VERSION.SDK_INT == 22 || inBubbleMode) {
             chatActivityEnterView.closeKeyboard();
         }
         if (currentChat != null && messageSuggestionParams != null || isEphemeralMessage || chatMode == MODE_WELCOME_MESSAGES) {
@@ -31817,7 +31818,10 @@ public class ChatActivity extends BaseFragment implements
         pausedDraft = null;
         applyDraftMaybe(draftChanged, draftChanged);
         applyChatLinkMessageMaybe();
-        if (bottomChannelButtonsLayout != null && bottomChannelButtonsLayout.getVisibility() != View.VISIBLE && !actionBar.isSearchFieldVisible() && chatMode != MODE_SEARCH && !BaseFragment.hasSheets(this)) {
+        // Skipped in a bubble: a field that is focused when the bubble window gets focus makes
+        // Android show the keyboard, and then the first back press only hides the keyboard instead
+        // of collapsing the bubble.
+        if (!inBubbleMode && bottomChannelButtonsLayout != null && bottomChannelButtonsLayout.getVisibility() != View.VISIBLE && !actionBar.isSearchFieldVisible() && chatMode != MODE_SEARCH && !BaseFragment.hasSheets(this)) {
             chatActivityEnterView.setFieldFocused(true);
         }
         if (chatActivityEnterView != null) {
