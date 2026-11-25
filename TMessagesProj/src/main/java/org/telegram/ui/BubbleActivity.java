@@ -295,6 +295,7 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
             backCallback = null;
         }
+        destroyChats();
         super.onDestroy();
         NotificationCenter.getGlobalInstance().removeObserver(bulletinObserver, NotificationCenter.showBulletin);
         pauseNetwork();
@@ -303,6 +304,22 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
         }
         onFinish();
         instance = null;
+    }
+
+    // The stack belongs to this window, so nothing else destroys these chats; left alone they stay
+    // registered for events until the app restarts. They were already paused with the window, and
+    // pausing one again would clear the open chat, so this skips removeAllFragments().
+    private void destroyChats() {
+        for (int a = mainFragmentsStack.size() - 1; a >= 0; a--) {
+            BaseFragment fragment = mainFragmentsStack.get(a);
+            try {
+                fragment.onFragmentDestroy();
+                fragment.setParentLayout(null);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        mainFragmentsStack.clear();
     }
 
     @Override
