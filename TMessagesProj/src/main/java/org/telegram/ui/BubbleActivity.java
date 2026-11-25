@@ -36,6 +36,8 @@ import org.telegram.ui.ActionBar.DrawerLayoutContainer;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.ActivityWindowEmptyBackgroundDrawable;
+import org.telegram.ui.Components.Bulletin;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.PasscodeView;
 import org.telegram.ui.Components.ThemeEditorView;
@@ -66,6 +68,32 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
     private int networkResumedAccount = -1;
     private boolean isResumed;
     private OnBackInvokedCallback backCallback;
+
+    // Global bulletins (a failed transcription, say) are only drawn by LaunchActivity, which sits
+    // behind the bubble, so show them here too while the bubble is in front. Posted, so this runs
+    // after LaunchActivity's own observer and the bulletin isn't replaced by the one drawn there.
+    private final NotificationCenter.NotificationCenterDelegate bulletinObserver = (id, account, args) -> {
+        if (id != NotificationCenter.showBulletin || args.length < 2 || !(args[1] instanceof String)) {
+            return;
+        }
+        final int type = (int) args[0];
+        final String text = (String) args[1];
+        final String subtitle = args.length > 2 && args[2] instanceof String ? (String) args[2] : null;
+        if (type != Bulletin.TYPE_ERROR && !(type == Bulletin.TYPE_ERROR_SUBTITLE && subtitle != null)) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            if (finished || !hasWindowFocus() || mainFragmentsStack.isEmpty()) {
+                return;
+            }
+            BaseFragment fragment = mainFragmentsStack.get(mainFragmentsStack.size() - 1);
+            if (type == Bulletin.TYPE_ERROR) {
+                BulletinFactory.of(fragment).createErrorBulletin(text).show();
+            } else {
+                BulletinFactory.of(fragment).createErrorBulletinSubtitle(text, subtitle, fragment.getResourceProvider()).show();
+            }
+        });
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,6 +145,7 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
         actionBarLayout.removeAllFragments();
 
         handleIntent(getIntent(), false, savedInstanceState != null, false, UserConfig.selectedAccount, 0);
+        NotificationCenter.getGlobalInstance().addObserver(bulletinObserver, NotificationCenter.showBulletin);
         instance = this;
 
         // The app opts in to OnBackInvokedCallback, so on Android 13+ onBackPressed() is only called
@@ -267,6 +296,7 @@ public class BubbleActivity extends BasePermissionsActivity implements INavigati
             backCallback = null;
         }
         super.onDestroy();
+        NotificationCenter.getGlobalInstance().removeObserver(bulletinObserver, NotificationCenter.showBulletin);
         pauseNetwork();
         if (currentAccount != -1) {
             AccountInstance.getInstance(currentAccount).getNotificationsController().setOpenedInBubble(dialogId, false);
